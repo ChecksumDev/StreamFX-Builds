@@ -286,46 +286,7 @@ endif()
 # Version override
 set(${PREFIX}VERSION "" CACHE STRING "Specify an override for the automatically detected version. Accepts a mixture of SemVer 2.0 and CMake Version.")
 
-# Features
-## Encoders
-set(${PREFIX}ENABLE_ENCODER_FFMPEG ${FEATURE_STABLE} CACHE BOOL "Enable FFmpeg Encoder integration.")
-set(${PREFIX}ENABLE_ENCODER_FFMPEG_AMF ${FEATURE_DEPRECATED} CACHE BOOL "Enable AMF Encoder in FFmpeg.")
-set(${PREFIX}ENABLE_ENCODER_FFMPEG_NVENC ${FEATURE_STABLE} CACHE BOOL "Enable NVENC Encoder in FFmpeg.")
-set(${PREFIX}ENABLE_ENCODER_FFMPEG_PRORES ${FEATURE_STABLE} CACHE BOOL "Enable ProRes Encoder in FFmpeg.")
-set(${PREFIX}ENABLE_ENCODER_FFMPEG_DNXHR ${FEATURE_STABLE} CACHE BOOL "Enable DNXHR Encoder in FFmpeg.")
-set(${PREFIX}ENABLE_ENCODER_FFMPEG_CFHD ${FEATURE_STABLE} CACHE BOOL "Enable CineForm Encoder in FFmpeg.")
-
-## Filters
-set(${PREFIX}ENABLE_FILTER_AUTOFRAMING ${FEATURE_EXPERIMENTAL} CACHE BOOL "Enable Auto-Framing Filter")
-set(${PREFIX}ENABLE_FILTER_AUTOFRAMING_NVIDIA ${FEATURE_EXPERIMENTAL} CACHE BOOL "Enable NVIDIA provider(s) Auto-Framing Filter")
-set(${PREFIX}ENABLE_FILTER_BLUR ${FEATURE_UNSTABLE} CACHE BOOL "Enable Blur Filter")
-set(${PREFIX}ENABLE_FILTER_COLOR_GRADE ${FEATURE_STABLE} CACHE BOOL "Enable Color Grade Filter")
-set(${PREFIX}ENABLE_FILTER_DENOISING ${FEATURE_EXPERIMENTAL} CACHE BOOL "Enable Denoising filter")
-set(${PREFIX}ENABLE_FILTER_DENOISING_NVIDIA ${FEATURE_EXPERIMENTAL} CACHE BOOL "Enable NVIDIA provider(s) for Denoising Filter")
-set(${PREFIX}ENABLE_FILTER_DYNAMIC_MASK ${FEATURE_STABLE} CACHE BOOL "Enable Dynamic Mask Filter")
-set(${PREFIX}ENABLE_FILTER_SDF_EFFECTS ${FEATURE_EXPERIMENTAL} CACHE BOOL "Enable SDF Effects Filter")
-set(${PREFIX}ENABLE_FILTER_SHADER ${FEATURE_EXPERIMENTAL} CACHE BOOL "Enable Shader Filter")
-set(${PREFIX}ENABLE_FILTER_TRANSFORM ${FEATURE_STABLE} CACHE BOOL "Enable Transform Filter")
-set(${PREFIX}ENABLE_FILTER_UPSCALING ${FEATURE_EXPERIMENTAL} CACHE BOOL "Enable Upscaling Filter")
-set(${PREFIX}ENABLE_FILTER_UPSCALING_NVIDIA ${FEATURE_EXPERIMENTAL} CACHE BOOL "Enable NVIDIA provider(s) for Upscaling Filter")
-set(${PREFIX}ENABLE_FILTER_VIRTUAL_GREENSCREEN ${FEATURE_EXPERIMENTAL} CACHE BOOL "Enable Virtual Greenscreen Filter")
-set(${PREFIX}ENABLE_FILTER_VIRTUAL_GREENSCREEN_NVIDIA ${FEATURE_EXPERIMENTAL} CACHE BOOL "Enable NVIDIA provider(s) for Virtual Greenscreen Filter")
-
-## Sources
-set(${PREFIX}ENABLE_SOURCE_MIRROR ${FEATURE_DEPRECATED} CACHE BOOL "Enable Mirror Source")
-set(${PREFIX}ENABLE_SOURCE_SHADER ${FEATURE_EXPERIMENTAL} CACHE BOOL "Enable Shader Source")
-
-## Transitions
-set(${PREFIX}ENABLE_TRANSITION_SHADER ${FEATURE_EXPERIMENTAL} CACHE BOOL "Enable Shader Transition")
-
-## FrontEnd & UI
-set(${PREFIX}ENABLE_FRONTEND ON CACHE BOOL "Enable Frontend code.")
-set(${PREFIX}ENABLE_UPDATER ON CACHE BOOL "Enable automatic update checks.")
-
-## Code Related
-set(${PREFIX}ENABLE_PROFILING OFF CACHE BOOL "Enable CPU and GPU performance tracking, which has a non-zero overhead at all times. Do not enable this for release builds.")
-
-## Compile/Link Related
+# Compile/Link Related
 set(${PREFIX}ENABLE_LTO ${D_HAS_IPO} CACHE BOOL "Enable Link Time Optimization for faster and smaller binaries.")
 set(${PREFIX}ENABLE_FASTMATH ON CACHE BOOL "Enable fast math optimizations, which sacrifice precision and stability.")
 if(D_PLATFORM_ARCH_X86)
@@ -425,251 +386,9 @@ endif()
 set_property(GLOBAL PROPERTY AUTOGEN_SOURCE_GROUP "User-Interface Files/Generated")
 
 ################################################################################
-# Components (Old System)
+# Dependencies
 ################################################################################
 
-# Component resolving:
-# 1. Check which features are enabled. For each feature, set what they require to ON.
-# 2. Try and find required items.
-# 3. Again check which features are enabled, if their requirements are missing, warn about it and disable them.
-# TODO: Consider making this an error instead.
-
-macro(is_feature_enabled FEATURE OUTPUT)
-	set(T_ENABLED ${${PREFIX}ENABLE_${FEATURE}})
-	set(T_DISABLED ${${PREFIX}DISABLE_${FEATURE}})
-	if(T_ENABLED AND NOT T_DISABLED)
-		set(${OUTPUT} ON)
-	else()
-		# set(${PREFIX}DISABLE_${FEATURE} ON CACHE INTERNAL "" FORCE)
-		set(${OUTPUT} OFF)
-	endif()
-endmacro()
-
-macro(set_feature_disabled FEATURE DISABLED)
-	set(${PREFIX}DISABLE_${FEATURE} ${DISABLED} CACHE INTERNAL "" FORCE)
-endmacro()
-
-# Features
-function(feature_encoder_ffmpeg RESOLVE)
-	is_feature_enabled(ENCODER_FFMPEG T_CHECK)
-	if(RESOLVE AND T_CHECK)
-		if(NOT HAVE_FFMPEG)
-			message(WARNING "FFmpeg Encoder requires FFmpeg. Disabling...")
-			set_feature_disabled(ENCODER_FFMPEG ON)
-		else()
-			# AMF
-			is_feature_enabled(ENCODER_FFMPEG_AMF T_CHECK)
-			if(T_CHECK AND D_PLATFORM_MAC)
-				message(WARNING "FFmpeg Encoder 'AMF' requires Windows or Linux. Disabling...")
-				set_feature_disabled(ENCODER_FFMPEG_AMF ON)
-			endif()
-
-			# NVENC
-			is_feature_enabled(ENCODER_FFMPEG_NVENC T_CHECK)
-			if(T_CHECK AND D_PLATFORM_MAC)
-				message(WARNING "FFmpeg Encoder 'NVENC' requires Windows or Linux. Disabling...")
-				set_feature_disabled(ENCODER_FFMPEG_NVENC ON)
-			endif()
-
-			# ProRes
-			is_feature_enabled(ENCODER_FFMPEG_PRORES T_CHECK)
-
-			# DNxHR
-			is_feature_enabled(ENCODER_FFMPEG_DNXHR T_CHECK)
-
-			# CineForm
-			is_feature_enabled(ENCODER_FFMPEG_CFHD T_CHECK)
-		endif()
-	elseif(T_CHECK)
-		set(REQUIRE_FFMPEG ON PARENT_SCOPE)
-	endif()
-endfunction()
-
-function(feature_encoder_aom_av1 RESOLVE)
-	is_feature_enabled(ENCODER_AOM_AV1 T_CHECK)
-	if(RESOLVE AND T_CHECK)
-		if(NOT HAVE_AOM)
-			message(WARNING "AOM AV1 encoder missing AOM library. Disabling...")
-			set_feature_disabled(ENCODER_AOM_AV1 ON)
-		endif()
-	elseif(T_CHECK)
-		set(REQUIRE_AOM ON PARENT_SCOPE)
-	endif()
-endfunction()
-
-function(feature_filter_autoframing RESOLVE)
-	is_feature_enabled(FILTER_AUTOFRAMING T_CHECK)
-	if(RESOLVE AND T_CHECK)
-		# Verify that the requirements for the providers are available
-		if(NOT HAVE_NVIDIA_AR_SDK)
-			message(WARNING "'NVIDIA Augmented Reality SDK' is missing. Disabling NVIDIA provider...")
-			set_feature_disabled(FILTER_AUTOFRAMING_NVIDIA ON)
-		endif()
-
-		# Verify that we have at least one provider for Auto-Framing.
-		is_feature_enabled(FILTER_AUTOFRAMING_NVIDIA T_CHECK_NVIDIA)
-		if(NOT T_CHECK_NVIDIA)
-			message(WARNING "Auto-Framing has no available providers. Disabling...")
-			set_feature_disabled(FILTER_AUTOFRAMING ON)
-		endif()
-	elseif(T_CHECK)
-		set(REQUIRE_NVIDIA_AR_SDK ON PARENT_SCOPE)
-		set(REQUIRE_NVIDIA_CUDA ON PARENT_SCOPE)
-	endif()
-endfunction()
-
-function(feature_filter_blur RESOLVE)
-	is_feature_enabled(FILTER_BLUR T_CHECK)
-endfunction()
-
-function(feature_filter_color_grade RESOLVE)
-	is_feature_enabled(FILTER_COLOR_GRADE T_CHECK)
-endfunction()
-
-function(feature_filter_denoising RESOLVE)
-	is_feature_enabled(FILTER_DENOISING T_CHECK)
-	if(RESOLVE AND T_CHECK)
-		# Verify that the requirements for the providers are available
-		if(NOT HAVE_NVIDIA_VFX_SDK)
-			message(WARNING "'NVIDIA Video Effects SDK' is missing. Disabling NVIDIA provider...")
-			set_feature_disabled(FILTER_DENOISING_NVIDIA ON)
-		endif()
-
-		# Verify that we have at least one provider for Video Denoising.
-		is_feature_enabled(FILTER_DENOISING_NVIDIA T_CHECK_NVIDIA)
-		if(NOT T_CHECK_NVIDIA)
-			message(WARNING "Denoising has no available providers. Disabling...")
-			set_feature_disabled(FILTER_DENOISING ON)
-		endif()
-	elseif(T_CHECK)
-		set(REQUIRE_NVIDIA_VFX_SDK ON PARENT_SCOPE)
-	endif()
-endfunction()
-
-function(feature_filter_dynamic_mask RESOLVE)
-	is_feature_enabled(FILTER_DYNAMIC_MASK T_CHECK)
-endfunction()
-
-function(feature_filter_sdf_effects RESOLVE)
-	is_feature_enabled(FILTER_SDF_EFFECTS T_CHECK)
-endfunction()
-
-function(feature_filter_shader RESOLVE)
-	is_feature_enabled(FILTER_SHADER T_CHECK)
-endfunction()
-
-function(feature_filter_transform RESOLVE)
-	is_feature_enabled(FILTER_TRANSFORM T_CHECK)
-endfunction()
-
-function(feature_filter_upscaling RESOLVE)
-	is_feature_enabled(FILTER_UPSCALING T_CHECK)
-	if(RESOLVE AND T_CHECK)
-		# Verify that the requirements for the providers are available
-		if(NOT HAVE_NVIDIA_VFX_SDK)
-			message(WARNING "'NVIDIA Video Effects SDK' is missing. Disabling NVIDIA provider(s)...")
-			set_feature_disabled(FILTER_UPSCALING_NVIDIA ON)
-		endif()
-
-		# Verify that we have at least one provider for Video Super-Resolution.
-		is_feature_enabled(FILTER_UPSCALING_NVIDIA T_CHECK_NVIDIA)
-		if(NOT T_CHECK_NVIDIA)
-			message(WARNING "Upscaling has no available providers. Disabling...")
-			set_feature_disabled(FILTER_UPSCALING ON)
-		endif()
-	elseif(T_CHECK)
-		set(REQUIRE_NVIDIA_VFX_SDK ON PARENT_SCOPE)
-	endif()
-endfunction()
-
-function(feature_filter_virtual_greenscreen RESOLVE)
-	is_feature_enabled(FILTER_VIRTUAL_GREENSCREEN T_CHECK)
-	if(RESOLVE AND T_CHECK)
-		# Verify that the requirements for the providers are available
-		if(NOT HAVE_NVIDIA_VFX_SDK)
-			message(WARNING "'NVIDIA Video Effects SDK' is missing. Disabling NVIDIA provider(s)...")
-			set_feature_disabled(FILTER_VIRTUAL_GREENSCREEN_NVIDIA ON)
-		endif()
-
-		# Verify that we have at least one provider for Video Super-Resolution.
-		is_feature_enabled(FILTER_VIRTUAL_GREENSCREEN_NVIDIA T_CHECK_NVIDIA)
-		if(NOT T_CHECK_NVIDIA)
-			message(WARNING "Virtual Greenscreen has no available providers. Disabling...")
-			set_feature_disabled(FILTER_VIRTUAL_GREENSCREEN ON)
-		endif()
-	elseif(T_CHECK)
-		set(REQUIRE_NVIDIA_VFX_SDK ON PARENT_SCOPE)
-	endif()
-endfunction()
-
-function(feature_source_mirror RESOLVE)
-	is_feature_enabled(SOURCE_MIRROR T_CHECK)
-endfunction()
-
-function(feature_source_shader RESOLVE)
-	is_feature_enabled(SOURCE_SHADER T_CHECK)
-endfunction()
-
-function(feature_transition_shader RESOLVE)
-	is_feature_enabled(TRANSITION_SHADER T_CHECK)
-endfunction()
-
-function(feature_frontend RESOLVE)
-	is_feature_enabled(FRONTEND T_CHECK)
-	if(RESOLVE AND T_CHECK)
-		if(NOT (Qt6_FOUND OR Qt5_FOUND))
-			message(WARNING "Front-End requires Qt. Disabling...")
-			set_feature_disabled(FRONTEND ON)
-		elseif(NOT obs-frontend-api_FOUND)
-			message(WARNING "Front-End requires OBS FrontEnd API. Disabling...")
-			set_feature_disabled(FRONTEND ON)
-		elseif(NOT HAVE_JSON)
-			message(WARNING "Front-End requires nlohmann::json. Disabling...")
-			set_feature_disabled(FRONTEND ON)
-		endif()
-	elseif(T_CHECK)
-		set(REQUIRE_QT ON PARENT_SCOPE)
-		set(REQUIRE_OBS_FRONTEND_API ON PARENT_SCOPE)
-		set(REQUIRE_JSON ON PARENT_SCOPE)
-	endif()
-endfunction()
-
-function(feature_updater RESOLVE)
-	is_feature_enabled(UPDATER T_CHECK)
-	if(RESOLVE AND T_CHECK)
-		if(NOT CURL_FOUND)
-			message(WARNING "Updater requires CURL. Disabling...")
-			set_feature_disabled(UPDATER ON)
-		elseif(NOT HAVE_JSON)
-			message(WARNING "Updater requires nlohmann::json. Disabling...")
-			set_feature_disabled(UPDATER ON)
-		endif()
-	elseif(T_CHECK)
-		set(REQUIRE_CURL ON PARENT_SCOPE)
-		set(REQUIRE_JSON ON PARENT_SCOPE)
-	endif()
-endfunction()
-
-# Set Requirements
-feature_encoder_ffmpeg(OFF)
-feature_encoder_aom_av1(OFF)
-feature_filter_autoframing(OFF)
-feature_filter_blur(OFF)
-feature_filter_color_grade(OFF)
-feature_filter_denoising(OFF)
-feature_filter_dynamic_mask(OFF)
-feature_filter_sdf_effects(OFF)
-feature_filter_shader(OFF)
-feature_filter_transform(OFF)
-feature_filter_upscaling(OFF)
-feature_filter_virtual_greenscreen(OFF)
-feature_source_mirror(OFF)
-feature_source_shader(OFF)
-feature_transition_shader(OFF)
-feature_frontend(OFF)
-feature_updater(OFF)
-
-# Fulfill Requirements
 #- OBS: Library
 if(STANDALONE)
 	find_package("libobs" REQUIRED CONFIG)
@@ -694,137 +413,32 @@ if(D_PLATFORM_MAC)
 endif()
 
 #- OBS: Front-End API
-set(obs-frontend-api_FOUND OFF)
-if(REQUIRE_OBS_FRONTEND_API)
-	if(STANDALONE)
-		find_package("obs-frontend-api" CONFIG)
-		set(obs-frontend-api_FOUND "${obs-frontend-api_FOUND}")
-	elseif(TARGET obs-frontend-api)
-		set(obs-frontend-api_FOUND ON)
-	endif()
-	if(NOT TARGET OBS::obs-frontend-api)
-		add_library(OBS::obs-frontend-api ALIAS obs-frontend-api)
-	endif()
+if(STANDALONE)
+	find_package("obs-frontend-api" CONFIG)
+	set(obs-frontend-api_FOUND "${obs-frontend-api_FOUND}")
+elseif(TARGET obs-frontend-api)
+	set(obs-frontend-api_FOUND ON)
+endif()
+if(NOT TARGET OBS::obs-frontend-api)
+	add_library(OBS::obs-frontend-api ALIAS obs-frontend-api)
 endif()
 
 #- CURL
-set(CURL_FOUND OFF)
-if(REQUIRE_CURL)
-	find_package("CURL")
-endif()
-
-#- FFmpeg
-set(HAVE_FFMPEG OFF)
-if(REQUIRE_FFMPEG)
-	find_package("FFmpeg"
-		COMPONENTS "avutil" "avcodec" "swscale"
-	)
-	set(HAVE_FFMPEG ${FFmpeg_FOUND})
-endif()
-
-#- AOM
-set(HAVE_AOM OFF)
-if(REQUIRE_AOM)
-	if(NOT D_PLATFORM_MAC)
-		find_package("AOM")
-		set(HAVE_AOM ${AOM_FOUND})
-	endif()
-endif()
+find_package("CURL")
 
 #- JSON
-set(HAVE_JSON OFF)
-if(REQUIRE_JSON)
-	if(NOT EXISTS "${PROJECT_SOURCE_DIR}/third-party/nlohmann-json/single_include")
-		message(FATAL_ERROR "Please make sure to update git submodules to their latest supported version.")
-		return()
-	else()
-		set(JSON_INCLUDE_DIR "${PROJECT_SOURCE_DIR}/third-party/nlohmann-json/single_include")
-		set(HAVE_JSON ON)
-	endif()
+if(NOT EXISTS "${PROJECT_SOURCE_DIR}/third-party/nlohmann-json/single_include")
+	message(FATAL_ERROR "Please make sure to update git submodules to their latest supported version.")
+	return()
+else()
+	set(JSON_INCLUDE_DIR "${PROJECT_SOURCE_DIR}/third-party/nlohmann-json/single_include")
 endif()
 
-#- NVIDIA Augmented Reality SDK
-set(HAVE_NVIDIA_AR_SDK OFF)
-if(REQUIRE_NVIDIA_AR_SDK AND D_PLATFORM_WINDOWS)
-	if(EXISTS "${PROJECT_SOURCE_DIR}/third-party/nvidia-maxine-ar-sdk/version.h")
-		set(HAVE_NVIDIA_AR_SDK ON)
-	endif()
-
-	if(NOT TARGET NVIDIA::AR)
-		add_library(NVIDIA::AR IMPORTED INTERFACE)
-		target_include_directories(NVIDIA::AR
-			INTERFACE
-				"${PROJECT_SOURCE_DIR}/third-party/nvidia-maxine-ar-sdk/nvar/include/"
-				"${PROJECT_SOURCE_DIR}/third-party/nvidia-maxine-ar-sdk/nvar/src/"
-		)
-	endif()
-endif()
-
-#- NVIDIA Video Effects SDK
-set(HAVE_NVIDIA_VFX_SDK OFF)
-if(REQUIRE_NVIDIA_VFX_SDK AND D_PLATFORM_WINDOWS)
-	if(EXISTS "${PROJECT_SOURCE_DIR}/third-party/nvidia-maxine-vfx-sdk/version.h")
-		set(HAVE_NVIDIA_VFX_SDK ON)
-	endif()
-
-	if(NOT TARGET NVIDIA::VFX)
-		add_library(NVIDIA::VFX IMPORTED INTERFACE)
-		target_include_directories(NVIDIA::VFX
-			INTERFACE
-				"${PROJECT_SOURCE_DIR}/third-party/nvidia-maxine-vfx-sdk/nvvfx/include/"
-				"${PROJECT_SOURCE_DIR}/third-party/nvidia-maxine-vfx-sdk/nvvfx/src/"
-		)
-	endif()
-
-	set(REQUIRE_NVIDIA_CUDA ON)
-endif()
-
-#- NVIDIA CUDA (Windows)
-set(HAVE_NVIDIA_CUDA OFF)
-if(REQUIRE_NVIDIA_CUDA AND D_PLATFORM_WINDOWS)
-	set(HAVE_NVIDIA_CUDA ON)
-endif()
-
-#- Qt
-if(REQUIRE_QT)
-	# Try Qt6 first...
-	find_package("Qt6"
-		COMPONENTS Core Gui Widgets
-		CONFIG
-	)
-
-	# If Qt6 isn't present, try Qt5
-	if(NOT Qt6_FOUND)
-		find_package("Qt5"
-			COMPONENTS Core Gui Widgets
-			CONFIG
-		)
-	endif()
-	if(Qt6_FOUND)
-		message(STATUS "Using Qt6.")
-	elseif(Qt5_FOUND)
-		message(STATUS "Using Qt5.")
-	endif()
-endif()
-
-# Verify Requirements
-feature_encoder_ffmpeg(ON)
-feature_encoder_aom_av1(ON)
-feature_filter_autoframing(ON)
-feature_filter_blur(ON)
-feature_filter_color_grade(ON)
-feature_filter_denoising(ON)
-feature_filter_dynamic_mask(ON)
-feature_filter_sdf_effects(ON)
-feature_filter_shader(ON)
-feature_filter_transform(ON)
-feature_filter_upscaling(ON)
-feature_filter_virtual_greenscreen(ON)
-feature_source_mirror(ON)
-feature_source_shader(ON)
-feature_transition_shader(ON)
-feature_frontend(ON)
-feature_updater(ON)
+#- Qt 6
+find_package("Qt6"
+	COMPONENTS Core Gui Widgets
+	CONFIG
+)
 
 ################################################################################
 # Code
@@ -873,27 +487,14 @@ LIST(APPEND PROJECT_PRIVATE_GENERATED "${PROJECT_BINARY_DIR}/generated/module.cp
 # Minimum Dependencies
 list(APPEND PROJECT_LIBRARIES OBS::libobs)
 
-# Components
-if(CURL_FOUND)
-	list(APPEND PROJECT_PRIVATE_SOURCE
-		"source/util/util-curl.hpp"
-		"source/util/util-curl.cpp"
-	)
-	list(APPEND PROJECT_LIBRARIES CURL::libcurl)
-endif()
+# Dependencies
+list(APPEND PROJECT_PRIVATE_SOURCE
+	"source/util/util-curl.hpp"
+	"source/util/util-curl.cpp"
+)
+list(APPEND PROJECT_LIBRARIES CURL::libcurl)
 
-if(HAVE_FFMPEG)
-	list(APPEND PROJECT_LIBRARIES
-		${FFMPEG_LIBRARIES}
-	)
-	list(APPEND PROJECT_INCLUDE_DIRS
-		${FFMPEG_INCLUDE_DIRS}
-	)
-endif()
-
-if(HAVE_JSON)
-	list(APPEND PROJECT_INCLUDE_DIRS ${JSON_INCLUDE_DIR})
-endif()
+list(APPEND PROJECT_INCLUDE_DIRS ${JSON_INCLUDE_DIR})
 
 if(TRUE) # OpenGL
 	if(NOT TARGET khronos_glad)
@@ -927,83 +528,12 @@ if(TRUE) # OpenGL
 	list(APPEND PROJECT_LIBRARIES khronos_glad)
 endif()
 
-if(HAVE_NVIDIA_VFX_SDK OR HAVE_NVIDIA_AR_SDK)
-	list(APPEND PROJECT_PRIVATE_SOURCE
-		"source/nvidia/cv/nvidia-cv.hpp"
-		"source/nvidia/cv/nvidia-cv.cpp"
-		"source/nvidia/cv/nvidia-cv-image.hpp"
-		"source/nvidia/cv/nvidia-cv-image.cpp"
-		"source/nvidia/cv/nvidia-cv-texture.hpp"
-		"source/nvidia/cv/nvidia-cv-texture.cpp"
-	)
-endif()
+list(APPEND PROJECT_LIBRARIES OBS::obs-frontend-api)
+list(APPEND PROJECT_UI_SOURCE
+	"source/obs/browser/obs-browser-panel.hpp"
+)
 
-if(HAVE_NVIDIA_AR_SDK)
-	list(APPEND PROJECT_PRIVATE_SOURCE
-		"source/nvidia/ar/nvidia-ar.hpp"
-		"source/nvidia/ar/nvidia-ar.cpp"
-		"source/nvidia/ar/nvidia-ar-feature.hpp"
-		"source/nvidia/ar/nvidia-ar-feature.cpp"
-		"source/nvidia/ar/nvidia-ar-facedetection.hpp"
-		"source/nvidia/ar/nvidia-ar-facedetection.cpp"
-	)
-	list(APPEND PROJECT_LIBRARIES
-		NVIDIA::AR
-	)
-endif()
-
-if(HAVE_NVIDIA_VFX_SDK)
-	list(APPEND PROJECT_PRIVATE_SOURCE
-		"source/nvidia/vfx/nvidia-vfx.hpp"
-		"source/nvidia/vfx/nvidia-vfx.cpp"
-		"source/nvidia/vfx/nvidia-vfx-denoising.hpp"
-		"source/nvidia/vfx/nvidia-vfx-denoising.cpp"
-		"source/nvidia/vfx/nvidia-vfx-effect.hpp"
-		"source/nvidia/vfx/nvidia-vfx-effect.cpp"
-		"source/nvidia/vfx/nvidia-vfx-greenscreen.hpp"
-		"source/nvidia/vfx/nvidia-vfx-greenscreen.cpp"
-		"source/nvidia/vfx/nvidia-vfx-superresolution.hpp"
-		"source/nvidia/vfx/nvidia-vfx-superresolution.cpp"
-	)
-	list(APPEND PROJECT_LIBRARIES
-		NVIDIA::VFX
-	)
-endif()
-
-if(HAVE_NVIDIA_CUDA)
-	list(APPEND PROJECT_PRIVATE_SOURCE
-		"source/nvidia/cuda/nvidia-cuda.hpp"
-		"source/nvidia/cuda/nvidia-cuda.cpp"
-		"source/nvidia/cuda/nvidia-cuda-obs.hpp"
-		"source/nvidia/cuda/nvidia-cuda-obs.cpp"
-		"source/nvidia/cuda/nvidia-cuda-context.hpp"
-		"source/nvidia/cuda/nvidia-cuda-context.cpp"
-		"source/nvidia/cuda/nvidia-cuda-gs-texture.hpp"
-		"source/nvidia/cuda/nvidia-cuda-gs-texture.cpp"
-		"source/nvidia/cuda/nvidia-cuda-memory.hpp"
-		"source/nvidia/cuda/nvidia-cuda-memory.cpp"
-		"source/nvidia/cuda/nvidia-cuda-stream.hpp"
-		"source/nvidia/cuda/nvidia-cuda-stream.cpp"
-	)
-	list(APPEND PROJECT_DEFINITIONS
-		ENABLE_NVIDIA_CUDA
-	)
-endif()
-
-if(REQUIRE_OBS_FRONTEND_API AND obs-frontend-api_FOUND)
-	list(APPEND PROJECT_LIBRARIES OBS::obs-frontend-api)
-	list(APPEND PROJECT_UI_SOURCE
-		"source/obs/browser/obs-browser-panel.hpp"
-	)
-endif()
-
-if(REQUIRE_QT)
-	if(Qt5_FOUND)
-		list(APPEND PROJECT_LIBRARIES Qt5::Core Qt5::Gui Qt5::Widgets)
-	elseif(Qt6_FOUND)
-		list(APPEND PROJECT_LIBRARIES Qt6::Core Qt6::Gui Qt6::Widgets)
-	endif()
-endif()
+list(APPEND PROJECT_LIBRARIES Qt6::Core Qt6::Gui Qt6::Widgets)
 
 ################################################################################
 # Features
@@ -1102,422 +632,50 @@ list(APPEND PROJECT_INCLUDE_DIRS
 	"${PROJECT_SOURCE_DIR}/source"
 )
 
-# Encoder/FFmpeg
-is_feature_enabled(ENCODER_FFMPEG T_CHECK)
-if(T_CHECK)
-	list(APPEND PROJECT_PRIVATE_SOURCE
-		# FFmpeg
-		"source/ffmpeg/avframe-queue.cpp"
-		"source/ffmpeg/avframe-queue.hpp"
-		"source/ffmpeg/swscale.hpp"
-		"source/ffmpeg/swscale.cpp"
-		"source/ffmpeg/tools.hpp"
-		"source/ffmpeg/tools.cpp"
-		"source/ffmpeg/hwapi/base.hpp"
-		"source/ffmpeg/hwapi/base.cpp"
-		"source/ffmpeg/hwapi/d3d11.hpp"
-		"source/ffmpeg/hwapi/d3d11.cpp"
-
-		# Encoders
-		"source/encoders/encoder-ffmpeg.hpp"
-		"source/encoders/encoder-ffmpeg.cpp"
-
-		# Encoders/Codecs
-		"source/encoders/codecs/hevc.hpp"
-		"source/encoders/codecs/hevc.cpp"
-		"source/encoders/codecs/h264.hpp"
-		"source/encoders/codecs/h264.cpp"
-		"source/encoders/codecs/prores.hpp"
-		"source/encoders/codecs/prores.cpp"
-		"source/encoders/codecs/dnxhr.hpp"
-		"source/encoders/codecs/dnxhr.cpp"
-
-		# Encoders/Handlers
-		"source/encoders/ffmpeg/handler.hpp"
-		"source/encoders/ffmpeg/handler.cpp"
-		"source/encoders/ffmpeg/debug.hpp"
-		"source/encoders/ffmpeg/debug.cpp"
-	)
-	list(APPEND PROJECT_DEFINITIONS
-		ENABLE_ENCODER_FFMPEG
-	)
-
-	# AMF
-	is_feature_enabled(ENCODER_FFMPEG_AMF T_CHECK)
-	if(T_CHECK)
-		list(APPEND PROJECT_PRIVATE_SOURCE
-			"source/encoders/ffmpeg/amf.hpp"
-			"source/encoders/ffmpeg/amf.cpp"
-		)
-		list(APPEND PROJECT_DEFINITIONS
-			ENABLE_ENCODER_FFMPEG_AMF
-		)
-	endif()
-
-	# NVENC
-	is_feature_enabled(ENCODER_FFMPEG_NVENC T_CHECK)
-	if(T_CHECK)
-		list(APPEND PROJECT_PRIVATE_SOURCE
-			"source/encoders/ffmpeg/nvenc.hpp"
-			"source/encoders/ffmpeg/nvenc.cpp"
-		)
-		list(APPEND PROJECT_DEFINITIONS
-			ENABLE_ENCODER_FFMPEG_NVENC
-		)
-	endif()
-
-	# ProRES
-	is_feature_enabled(ENCODER_FFMPEG_PRORES T_CHECK)
-	if(T_CHECK)
-		list(APPEND PROJECT_PRIVATE_SOURCE
-			"source/encoders/ffmpeg/prores_aw.hpp"
-			"source/encoders/ffmpeg/prores_aw.cpp"
-		)
-		list(APPEND PROJECT_DEFINITIONS
-			ENABLE_ENCODER_FFMPEG_PRORES
-		)
-	endif()
-
-	# DNxHR
-	is_feature_enabled(ENCODER_FFMPEG_DNXHR T_CHECK)
-	if(T_CHECK)
-		list(APPEND PROJECT_PRIVATE_SOURCE
-			"source/encoders/ffmpeg/dnxhd.hpp"
-			"source/encoders/ffmpeg/dnxhd.cpp"
-		)
-		list(APPEND PROJECT_DEFINITIONS
-			ENABLE_ENCODER_FFMPEG_DNXHR
-		)
-	endif()
-
-	# CineForm HD
-	is_feature_enabled(ENCODER_FFMPEG_CFHD T_CHECK)
-	if(T_CHECK)
-		list(APPEND PROJECT_PRIVATE_SOURCE
-			"source/encoders/ffmpeg/cfhd.hpp"
-			"source/encoders/ffmpeg/cfhd.cpp"
-		)
-		list(APPEND PROJECT_DEFINITIONS
-			ENABLE_ENCODER_FFMPEG_CFHD
-		)
-	endif()
-endif()
-
-# Filter/Auto-Framing
-is_feature_enabled(FILTER_AUTOFRAMING T_CHECK)
-if(T_CHECK)
-	list(APPEND PROJECT_PRIVATE_SOURCE
-		"source/filters/filter-autoframing.hpp"
-		"source/filters/filter-autoframing.cpp"
-	)
-	list(APPEND PROJECT_DEFINITIONS
-		ENABLE_FILTER_AUTOFRAMING
-	)
-	is_feature_enabled(FILTER_AUTOFRAMING_NVIDIA T_CHECK)
-	if(T_CHECK)
-		list(APPEND PROJECT_DEFINITIONS
-			ENABLE_FILTER_AUTOFRAMING_NVIDIA
-		)
-	endif()
-endif()
-
-# Filter/Blur
-is_feature_enabled(FILTER_BLUR T_CHECK)
-if(T_CHECK)
-	list(APPEND PROJECT_DATA
-		"data/effects/mask.effect"
-		"data/effects/blur/common.effect"
-		"data/effects/blur/box.effect"
-		"data/effects/blur/box-linear.effect"
-		"data/effects/blur/dual-filtering.effect"
-		"data/effects/blur/gaussian.effect"
-		"data/effects/blur/gaussian-linear.effect"
-	)
-	list(APPEND PROJECT_PRIVATE_SOURCE
-		"source/gfx/blur/gfx-blur-base.hpp"
-		"source/gfx/blur/gfx-blur-base.cpp"
-		"source/gfx/blur/gfx-blur-box.hpp"
-		"source/gfx/blur/gfx-blur-box.cpp"
-		"source/gfx/blur/gfx-blur-box-linear.hpp"
-		"source/gfx/blur/gfx-blur-box-linear.cpp"
-		"source/gfx/blur/gfx-blur-dual-filtering.hpp"
-		"source/gfx/blur/gfx-blur-dual-filtering.cpp"
-		"source/gfx/blur/gfx-blur-gaussian.hpp"
-		"source/gfx/blur/gfx-blur-gaussian.cpp"
-		"source/gfx/blur/gfx-blur-gaussian-linear.hpp"
-		"source/gfx/blur/gfx-blur-gaussian-linear.cpp"
-		"source/filters/filter-blur.hpp"
-		"source/filters/filter-blur.cpp"
-	)
-	list(APPEND PROJECT_DEFINITIONS
-		ENABLE_FILTER_BLUR
-	)
-endif()
-
-# Filter/Color Grade
-is_feature_enabled(FILTER_COLOR_GRADE T_CHECK)
-if(T_CHECK)
-	list(APPEND PROJECT_DATA
-		"data/effects/color-grade.effect"
-	)
-	list(APPEND PROJECT_PRIVATE_SOURCE
-		"source/filters/filter-color-grade.hpp"
-		"source/filters/filter-color-grade.cpp"
-	)
-	list(APPEND PROJECT_DEFINITIONS
-		ENABLE_FILTER_COLOR_GRADE
-	)
-	set(REQUIRE_LUT ON)
-endif()
-
-# Filter/Dynamic Mask
-is_feature_enabled(FILTER_DYNAMIC_MASK T_CHECK)
-if(T_CHECK)
-	list(APPEND PROJECT_DATA
-		"data/effects/channel-mask.effect"
-	)
-	list(APPEND PROJECT_PRIVATE_SOURCE
-		"source/filters/filter-dynamic-mask.hpp"
-		"source/filters/filter-dynamic-mask.cpp"
-	)
-	list(APPEND PROJECT_DEFINITIONS
-		ENABLE_FILTER_DYNAMIC_MASK
-	)
-endif()
-
-# Filter/SDF Effects
-is_feature_enabled(FILTER_SDF_EFFECTS T_CHECK)
-if(T_CHECK)
-	list(APPEND PROJECT_DATA
-		"data/effects/sdf/sdf-producer.effect"
-		"data/effects/sdf/sdf-consumer.effect"
-	)
-	list(APPEND PROJECT_PRIVATE_SOURCE
-		"source/filters/filter-sdf-effects.hpp"
-		"source/filters/filter-sdf-effects.cpp"
-	)
-	list(APPEND PROJECT_DEFINITIONS
-		ENABLE_FILTER_SDF_EFFECTS
-	)
-endif()
-
-# Filter/Shader
-is_feature_enabled(FILTER_SHADER T_CHECK)
-if(T_CHECK)
-	set(REQUIRE_PART_SHADER ON)
-	list(APPEND PROJECT_PRIVATE_SOURCE
-		"source/filters/filter-shader.hpp"
-		"source/filters/filter-shader.cpp"
-	)
-	list(APPEND PROJECT_DEFINITIONS
-		ENABLE_FILTER_SHADER
-	)
-endif()
-
-# Filter/Transform
-is_feature_enabled(FILTER_TRANSFORM T_CHECK)
-if(T_CHECK)
-	list(APPEND PROJECT_PRIVATE_SOURCE
-		"source/filters/filter-transform.hpp"
-		"source/filters/filter-transform.cpp"
-	)
-	list(APPEND PROJECT_DEFINITIONS
-		ENABLE_FILTER_TRANSFORM
-	)
-endif()
-
-# Filter/Denoising
-is_feature_enabled(FILTER_DENOISING T_CHECK)
-if(T_CHECK)
-	list(APPEND PROJECT_PRIVATE_SOURCE
-		"source/filters/filter-denoising.hpp"
-		"source/filters/filter-denoising.cpp"
-	)
-	list(APPEND PROJECT_DEFINITIONS
-		ENABLE_FILTER_DENOISING
-	)
-	is_feature_enabled(FILTER_DENOISING_NVIDIA T_CHECK)
-	if(T_CHECK)
-		list(APPEND PROJECT_DEFINITIONS
-			ENABLE_FILTER_DENOISING_NVIDIA
-		)
-	endif()
-endif()
-
-# Filter/Upscaling
-is_feature_enabled(FILTER_UPSCALING T_CHECK)
-if(T_CHECK)
-	list(APPEND PROJECT_PRIVATE_SOURCE
-		"source/filters/filter-upscaling.hpp"
-		"source/filters/filter-upscaling.cpp"
-	)
-	list(APPEND PROJECT_DEFINITIONS
-		ENABLE_FILTER_UPSCALING
-	)
-	is_feature_enabled(FILTER_UPSCALING_NVIDIA T_CHECK)
-	if(T_CHECK)
-		list(APPEND PROJECT_DEFINITIONS
-			ENABLE_FILTER_UPSCALING_NVIDIA
-		)
-	endif()
-endif()
-
-# Filter/Virtual Greenscreen
-is_feature_enabled(FILTER_VIRTUAL_GREENSCREEN T_CHECK)
-if(T_CHECK)
-	list(APPEND PROJECT_PRIVATE_SOURCE
-		"source/filters/filter-virtual-greenscreen.hpp"
-		"source/filters/filter-virtual-greenscreen.cpp"
-	)
-	list(APPEND PROJECT_DEFINITIONS
-		ENABLE_FILTER_VIRTUAL_GREENSCREEN
-	)
-	is_feature_enabled(FILTER_VIRTUAL_GREENSCREEN_NVIDIA T_CHECK)
-	if(T_CHECK)
-		list(APPEND PROJECT_DEFINITIONS
-			ENABLE_FILTER_VIRTUAL_GREENSCREEN_NVIDIA
-		)
-	endif()
-endif()
-
-# Source/Mirror
-is_feature_enabled(SOURCE_MIRROR T_CHECK)
-if(T_CHECK)
-	list(APPEND PROJECT_PRIVATE_SOURCE
-		"source/sources/source-mirror.hpp"
-		"source/sources/source-mirror.cpp"
-	)
-	list(APPEND PROJECT_DEFINITIONS
-		ENABLE_SOURCE_MIRROR
-	)
-endif()
-
-# Source/Shader
-is_feature_enabled(SOURCE_SHADER T_CHECK)
-if(T_CHECK)
-	set(REQUIRE_PART_SHADER ON)
-	list(APPEND PROJECT_PRIVATE_SOURCE
-		"source/sources/source-shader.hpp"
-		"source/sources/source-shader.cpp"
-	)
-	list(APPEND PROJECT_DEFINITIONS
-		ENABLE_SOURCE_SHADER
-	)
-endif()
-
-# Transition/Shader
-is_feature_enabled(TRANSITION_SHADER T_CHECK)
-if(T_CHECK)
-	set(REQUIRE_PART_SHADER ON)
-	list(APPEND PROJECT_PRIVATE_SOURCE
-		"source/transitions/transition-shader.hpp"
-		"source/transitions/transition-shader.cpp"
-	)
-	list(APPEND PROJECT_DEFINITIONS
-		ENABLE_TRANSITION_SHADER
-	)
-endif()
-
 # Profiling
-is_feature_enabled(PROFILING T_CHECK)
-if(T_CHECK)
-	list(APPEND PROJECT_PRIVATE_SOURCE
-		"source/util/util-profiler.cpp"
-		"source/util/util-profiler.hpp"
-	)
-	list(APPEND PROJECT_DEFINITIONS
-		ENABLE_PROFILING
-	)
-endif()
+list(APPEND PROJECT_PRIVATE_SOURCE
+	"source/util/util-profiler.cpp"
+	"source/util/util-profiler.hpp"
+)
 
 # Updater
-is_feature_enabled(UPDATER T_CHECK)
-if(T_CHECK)
-	list(APPEND PROJECT_PRIVATE_SOURCE
-		"source/updater.hpp"
-		"source/updater.cpp"
-	)
-	list(APPEND PROJECT_DEFINITIONS
-		ENABLE_UPDATER
-	)
-endif()
+list(APPEND PROJECT_PRIVATE_SOURCE
+	"source/updater.hpp"
+	"source/updater.cpp"
+)
 
 # Frontend
-is_feature_enabled(FRONTEND T_CHECK)
-if(T_CHECK)
-	list(APPEND PROJECT_UI
-		"ui/streamfx.qrc"
-		"ui/about.ui"
-		"ui/about-entry.ui"
-	)
-	list(APPEND PROJECT_UI_SOURCE
-		"source/ui/ui-common.hpp"
-		"source/ui/ui.hpp"
-		"source/ui/ui.cpp"
-		"source/ui/ui-about.hpp"
-		"source/ui/ui-about.cpp"
-		"source/ui/ui-about-entry.hpp"
-		"source/ui/ui-about-entry.cpp"
-		"source/ui/ui-obs-browser-widget.hpp"
-		"source/ui/ui-obs-browser-widget.cpp"
-	)
-	list(APPEND PROJECT_INCLUDE_DIRS
-		"source/ui"
-	)
-	list(APPEND PROJECT_DEFINITIONS
-		ENABLE_FRONTEND
-	)
+list(APPEND PROJECT_UI
+	"ui/streamfx.qrc"
+	"ui/about.ui"
+	"ui/about-entry.ui"
+)
+list(APPEND PROJECT_UI_SOURCE
+	"source/ui/ui-common.hpp"
+	"source/ui/ui.hpp"
+	"source/ui/ui.cpp"
+	"source/ui/ui-about.hpp"
+	"source/ui/ui-about.cpp"
+	"source/ui/ui-about-entry.hpp"
+	"source/ui/ui-about-entry.cpp"
+	"source/ui/ui-obs-browser-widget.hpp"
+	"source/ui/ui-obs-browser-widget.cpp"
+)
+list(APPEND PROJECT_INCLUDE_DIRS
+	"source/ui"
+)
 
-	is_feature_enabled(UPDATER T_CHECK)
-	if(T_CHECK)
-		list(APPEND PROJECT_UI_SOURCE
-			"source/ui/ui-updater.hpp"
-			"source/ui/ui-updater.cpp"
-		)
-		list(APPEND PROJECT_UI
-			"ui/updater.ui"
-		)
-	endif()
-endif()
+list(APPEND PROJECT_UI_SOURCE
+	"source/ui/ui-updater.hpp"
+	"source/ui/ui-updater.cpp"
+)
+list(APPEND PROJECT_UI
+	"ui/updater.ui"
+)
 
 ################################################################################
 # Parts
 ################################################################################
-
-# Shaders
-if(REQUIRE_PART_SHADER)
-	list(APPEND PROJECT_PRIVATE_SOURCE
-		"source/gfx/shader/gfx-shader.hpp"
-		"source/gfx/shader/gfx-shader.cpp"
-		"source/gfx/shader/gfx-shader-param.hpp"
-		"source/gfx/shader/gfx-shader-param.cpp"
-		"source/gfx/shader/gfx-shader-param-audio.hpp"
-		"source/gfx/shader/gfx-shader-param-audio.cpp"
-		"source/gfx/shader/gfx-shader-param-basic.hpp"
-		"source/gfx/shader/gfx-shader-param-basic.cpp"
-		"source/gfx/shader/gfx-shader-param-matrix.hpp"
-		"source/gfx/shader/gfx-shader-param-matrix.cpp"
-		"source/gfx/shader/gfx-shader-param-texture.hpp"
-		"source/gfx/shader/gfx-shader-param-texture.cpp"
-	)
-endif()
-
-# LUT
-if(REQUIRE_LUT)
-	list(APPEND PROJECT_PRIVATE_SOURCE
-		"source/gfx/lut/gfx-lut.hpp"
-		"source/gfx/lut/gfx-lut.cpp"
-		"source/gfx/lut/gfx-lut-consumer.hpp"
-		"source/gfx/lut/gfx-lut-consumer.cpp"
-		"source/gfx/lut/gfx-lut-producer.hpp"
-		"source/gfx/lut/gfx-lut-producer.cpp"
-	)
-	list(APPEND PROJECT_DATA
-		"data/effects/lut.effect"
-		"data/effects/lut-consumer.effect"
-		"data/effects/lut-producer.effect"
-	)
-endif()
 
 # Windows
 if(D_PLATFORM_WINDOWS)
@@ -1590,6 +748,7 @@ endif()
 define_property(TARGET PROPERTY COMPONENT_LABEL)
 define_property(TARGET PROPERTY COMPONENT_NAME)
 define_property(TARGET PROPERTY COMPONENT_OPTION)
+define_property(TARGET PROPERTY COMPONENT_RESOLVER)
 define_property(TARGET PROPERTY COMPONENT_DEPENDS)
 
 function(streamfx_add_library TARGET_NAME TARGET_TYPE)
@@ -1861,17 +1020,27 @@ function(streamfx_add_library TARGET_NAME TARGET_TYPE)
 	endif()
 endfunction()
 
+function(streamfx_sanitize_name TEXT _OUTPUT_NAME _OUTPUT_TARGET _OUTPUT_OPTION)
+	string(REGEX REPLACE "^[ \t]+" "" TEXT "${TEXT}")
+	string(REGEX REPLACE "[ \t]+$" "" TEXT "${TEXT}")
+	string(REGEX REPLACE "[^a-zA-Z0-9_-]+" "_" TEXT2 "${TEXT}")
+	string(REGEX REPLACE "_[_]+" "_" TEXT2 "${TEXT2}")
+	string(TOUPPER "${TEXT2}" TEXT3)
+
+	set(${_OUTPUT_NAME} "${TEXT}" PARENT_SCOPE)
+	set(${_OUTPUT_TARGET} "${TEXT2}" PARENT_SCOPE)
+	set(${_OUTPUT_OPTION} "${TEXT3}" PARENT_SCOPE)
+endfunction()
+
 function(streamfx_add_component COMPONENT_NAME)
-	# Sanitize the component name by trimming whitespace.
-	string(REGEX REPLACE "^[ \t]+" "" COMPONENT_NAME "${COMPONENT_NAME}")
-	string(REGEX REPLACE "[ \t]+$" "" COMPONENT_NAME "${COMPONENT_NAME}")
+	cmake_parse_arguments(PARSE_ARGV 1 _ARG
+		""
+		"RESOLVER"
+		""
+	)
 
-	# Generate a sanitized version of the component name for use in targets and options.
-	string(REGEX REPLACE "[^a-zA-Z0-9_-]+" "_" COMPONENT_SANITIZED_NAME "${COMPONENT_NAME}")
-	string(REGEX REPLACE "_[_]+" "_" COMPONENT_SANITIZED_NAME "${COMPONENT_SANITIZED_NAME}")
-
-	# Convert the sanitized version to upper case.
-	string(TOUPPER "${COMPONENT_SANITIZED_NAME}" COMPONENT_OPTION_NAME)
+	# Sanitize name for further use.
+	streamfx_sanitize_name("${COMPONENT_NAME}" COMPONENT_NAME COMPONENT_SANITIZED_NAME COMPONENT_OPTION_NAME)
 	set(COMPONENT_OPTION "${PREFIX}COMPONENT_${COMPONENT_OPTION_NAME}")
 	set(COMPONENT_OPTION "${COMPONENT_OPTION}" PARENT_SCOPE)
 
@@ -1895,16 +1064,24 @@ function(streamfx_add_component COMPONENT_NAME)
 	# Register the component globally.
 	get_target_property(_DEPENDS StreamFX COMPONENT_DEPENDS)
 	if(_DEPENDS)
-		list(APPEND _DEPENDS "${COMPONENT_TARGET}")
+		list(APPEND _DEPENDS "${COMPONENT_SANITIZED_NAME}")
 	else()
-		set(_DEPENDS "${COMPONENT_TARGET}")
+		set(_DEPENDS "${COMPONENT_SANITIZED_NAME}")
 	endif()
 	set_target_properties(StreamFX PROPERTIES 
 		COMPONENT_DEPENDS "${_DEPENDS}"
 	)
+	
+	# If there is a resolver function, register it.
+	if(_ARG_RESOLVER)
+		set_target_properties(${COMPONENT_TARGET} PROPERTIES
+			COMPONENT_RESOLVER "${_ARG_RESOLVER}"
+		)
+	endif()
 
 	# Allow disabling this component.
 	set(${COMPONENT_OPTION} ON CACHE BOOL "Enable the ${COMPONENT_NAME} component?")
+	set(${COMPONENT_OPTION}_DISABLED OFF CACHE INTERNAL "Disable the ${_NAME} component?" FORCE)
 
 	# Add common include directories
 	target_include_directories(${COMPONENT_TARGET}
@@ -1988,11 +1165,79 @@ function(streamfx_add_component COMPONENT_NAME)
 	)
 endfunction()
 
-# Use this to add a dependency on another component, 
+function(streamfx_has_component _NAME _OUTPUT)
+	streamfx_sanitize_name("${_NAME}" _NAME _TARGET _OPTION)
+
+	set(${_OUTPUT} OFF PARENT_SCOPE)
+	if(TARGET "StreamFX_${_TARGET}")		
+		set(${_OUTPUT} ON PARENT_SCOPE)
+	endif()
+endfunction()
+
+function(streamfx_enabled_component _NAME _OUTPUT)
+	streamfx_sanitize_name("${_NAME}" _NAME _TARGET _OPTION)
+	if(NOT TARGET "StreamFX_${_TARGET}")
+		message(FATAL_ERROR "Unknown component '${_NAME}'.")
+	endif()
+
+	get_target_property(_OPTION "StreamFX_${_TARGET}" COMPONENT_OPTION)
+	set(${_OUTPUT} OFF PARENT_SCOPE)
+	if(${_OPTION} AND NOT (${_OPTION}_DISABLED))
+		set(${_OUTPUT} ON PARENT_SCOPE)
+	endif()	
+endfunction()
+
+# Use this to add a dependency on another component.
 function(streamfx_add_component_dependency _NAME)
-	get_target_property(DEPENDS ${COMPONENT_TARGET} COMPONENT_DEPENDS)
-	list(APPEND DEPENDS "${_NAME}")
-	set_target_properties(${COMPONENT_TARGET} PROPERTIES COMPONENT_DEPENDS "${DEPENDS}")
+	cmake_parse_arguments(PARSE_ARGV 1 _ARG
+		"OPTIONAL"
+		""
+		""
+	)
+
+	streamfx_sanitize_name("${_NAME}" _NAME _TARGET _OPTION)
+
+	set(DEPENDENCY "${_TARGET}")
+	if(_ARG_OPTIONAL)
+		list(APPEND DEPENDENCY "OPTIONAL")
+	endif()
+	string(REPLACE ";" "\\;" DEPENDENCY "${DEPENDENCY}")
+
+	get_target_property(DEPENDS "${COMPONENT_TARGET}" COMPONENT_DEPENDS)
+	if(DEPENDS)
+		list(APPEND DEPENDS "${DEPENDENCY}")
+	else()
+		set(DEPENDS "${DEPENDENCY}")
+	endif()
+	set_target_properties("${COMPONENT_TARGET}" PROPERTIES COMPONENT_DEPENDS "${DEPENDS}")
+endfunction()
+
+# Use this to disable a component via script.
+function(streamfx_disable_component _NAME)
+	cmake_parse_arguments(PARSE_ARGV 1 _ARG
+		""
+		"REASON"
+		""
+	)
+
+	streamfx_sanitize_name("${_NAME}" _NAME _TARGET _OPTION)
+	if(NOT (_TARGET MATCHES "^StreamFX_"))
+		set(_TARGET "StreamFX_${_TARGET}")
+	endif()
+
+	# If the component doesn't exist, skip it.
+	if(NOT TARGET ${_TARGET})
+		message(WARNING "Not disabling invalid component '${_NAME}'.")
+		return()
+	endif()
+	
+	get_target_property(_LABEL ${_TARGET} COMPONENT_LABEL)
+	get_target_property(_OPTION ${_TARGET} COMPONENT_OPTION)
+
+	CacheSet(${_OPTION}_DISABLED ON)
+	if(_ARG_REASON)
+		message(STATUS "[${_LABEL}] Disabled due to: ${_ARG_REASON}")
+	endif()
 endfunction()
 
 ################################################################################
@@ -2148,23 +1393,21 @@ set_source_files_properties(${PROJECT_DATA} ${PROJECT_TEMPLATES} ${PROJECT_UI} $
 )
 
 # Enable Qt if needed
-if(Qt5_Found OR Qt6_FOUND)
-	set_target_properties(StreamFX_Core PROPERTIES
-		AUTOUIC ON
-		AUTOUIC_SEARCH_PATHS "${CMAKE_CURRENT_SOURCE_DIR};${CMAKE_CURRENT_SOURCE_DIR}/ui"
-		AUTOMOC ON
-		AUTORCC ON
-		AUTOGEN_BUILD_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated"
-	)
+set_target_properties(StreamFX_Core PROPERTIES
+	AUTOUIC ON
+	AUTOUIC_SEARCH_PATHS "${CMAKE_CURRENT_SOURCE_DIR};${CMAKE_CURRENT_SOURCE_DIR}/ui"
+	AUTOMOC ON
+	AUTORCC ON
+	AUTOGEN_BUILD_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated"
+)
 
-	# Prevent non-UI files from being Qt'd
-	set_source_files_properties(${PROJECT_DATA} ${PROJECT_TEMPLATES} ${PROJECT_MEDIA} ${PROJECT_PRIVATE_GENERATED} ${PROJECT_PRIVATE_SOURCE} PROPERTIES
-		SKIP_AUTOGEN ON
-		SKIP_AUTOMOC ON
-		SKIP_AUTORCC ON
-		SKIP_AUTOUIC ON
-	)
-endif()
+# Prevent non-UI files from being Qt'd
+set_source_files_properties(${PROJECT_DATA} ${PROJECT_TEMPLATES} ${PROJECT_MEDIA} ${PROJECT_PRIVATE_GENERATED} ${PROJECT_PRIVATE_SOURCE} PROPERTIES
+	SKIP_AUTOGEN ON
+	SKIP_AUTOMOC ON
+	SKIP_AUTORCC ON
+	SKIP_AUTOUIC ON
+)
 
 target_sources(StreamFX_Core PRIVATE ${PROJECT_FILES})
 
@@ -2175,59 +1418,148 @@ target_sources(StreamFX_Core PRIVATE ${PROJECT_FILES})
 # for an improved system which suffers under less issues. This new component
 # system should address the main necessary parts,
 
+#- Registration
 file(GLOB COMPONENTS RELATIVE ${PROJECT_SOURCE_DIR} CONFIGURE_DEPENDS ${PROJECT_SOURCE_DIR}/components/*)
 foreach(COMPONENT ${COMPONENTS})
-	add_subdirectory(${COMPONENT} EXCLUDE_FROM_ALL)
+	# Ignore directories with no CMakeLists.txt
+	if(EXISTS "${PROJECT_SOURCE_DIR}/${COMPONENT}/CMakeLists.txt")
+		add_subdirectory(${COMPONENT} EXCLUDE_FROM_ALL)
+	endif()
 endforeach()
 
-################################################################################
-# Resolve Components
-################################################################################
-target_link_libraries(StreamFX PRIVATE $<LINK_LIBRARY:WHOLE_ARCHIVE,StreamFX_Core>)
+get_target_property(_UNRESOLVED StreamFX COMPONENT_DEPENDS)
+set(_RESOLVED "")
+set(_DISABLED "")
 
-get_target_property(_DEPENDS StreamFX COMPONENT_DEPENDS)
-if(_DEPENDS)
-	foreach(COMPONENT ${_DEPENDS})
-		# If the component doesn't exist, skip it.
-		if(NOT TARGET ${COMPONENT})
-			message(WARNING "Encountered invalid component '${COMPONENT}' in list of all components.")
-			continue()
-		endif()
+#- Cleanup
+list(REMOVE_DUPLICATES _UNRESOLVED)
+foreach(_ENTITY ${_UNRESOLVED})
+	# Remove any invalid entries.
+	if(NOT TARGET "StreamFX_${_ENTITY}")
+		message(WARNING "Encountered invalid component '${_ENTITY}', removing...")
+		list(REMOVE_ITEM _UNRESOLVED "${_ENTITY}")
+		continue()
+	endif()
+endforeach()
 
-		get_target_property(_NAME ${COMPONENT} COMPONENT_LABEL)
+#- Resolve Dependencies in a loop
+set(_UNRESOLVED_LOOP 0)
+while(_UNRESOLVED)
+	MATH(EXPR _UNRESOLVED_LOOP "${_UNRESOLVED_LOOP}+1")	
+	if(_UNRESOLVED_LOOP GREATER_EQUAL 10)
+		message(FATAL_ERROR "Infinite loop while resolving components: ${_UNRESOLVED}")
+	endif()
 
-		# If the component is disabled, skip it.
-		get_target_property(_OPTION ${COMPONENT} COMPONENT_OPTION)
-		if(NOT ${_OPTION})
-			message(STATUS "[${_NAME}] Disabled by developer.")
-			continue()
-		elseif(${_OPTION}_DISABLED)
-			message(STATUS "[${_NAME}] Disabled by build script.")
-			continue()
-		endif()
+	# Attempt to resolve while there are still unresolved entries.
+	foreach(_ENTITY ${_UNRESOLVED})
+		set(RENTITY "StreamFX_${_ENTITY}")
 		
-		# Test if all dependencies are valid.
-		set(_HASDEPENDENCY ON)
-		get_target_property(_DEPENDS ${COMPONENT} COMPONENT_DEPENDS)
+		get_target_property(_ALIAS "${RENTITY}" COMPONENT_NAME)
+		get_target_property(_LABEL "${RENTITY}" COMPONENT_LABEL)
+		get_target_property(_OPTION "${RENTITY}" COMPONENT_OPTION)
+		get_target_property(_DEPENDS "${RENTITY}" COMPONENT_DEPENDS)
+		get_target_property(_RESOLVER "${RENTITY}" COMPONENT_RESOLVER)
+	
+		# Remove any that have been disabled.
+		if(NOT ${_OPTION})
+			message(STATUS "[${_LABEL}] Disabled by user.")
+			list(REMOVE_ITEM _UNRESOLVED "${_ENTITY}")
+			list(APPEND _DISABLED "${_ENTITY}")
+			continue()
+		elseif(${_OPTION}_DISABLED) # Test for pre-resolve disabling.
+			message(STATUS "[${_LABEL}] Disabled by build script.")
+			list(REMOVE_ITEM _UNRESOLVED "${_ENTITY}")
+			list(APPEND _DISABLED "${_ENTITY}")
+			continue()
+		endif()
+
+		# Check if all dependencies are resolved.
+		set(_HAS_UNRESOLVED_DEPENDS OFF)
+		set(_HAS_DISABLED_DEPENDS OFF)
+		set(_HAS_UNRESOLVED_OPTIONAL_DEPENDS OFF)
+		if(_DEPENDS)
+			foreach(_DEPEND ${_DEPENDS})
+				list(GET _DEPEND 0 _ENTITY2)
+				set(RENTITY2 "StreamFX_${_ENTITY2}")
+				
+				get_target_property(_ENTITY2_LABEL "${RENTITY2}" COMPONENT_LABEL)
+
+				if(NOT ("OPTIONAL" IN_LIST _DEPEND))
+					if("${_ENTITY2}" IN_LIST _DISABLED)
+						message("[${_LABEL}] Required dependency '${_ENTITY2_LABEL}' is disabled.")
+						set(_HAS_DISABLED_DEPENDS ON)
+					endif()
+					if("${_ENTITY2}" IN_LIST _UNRESOLVED)
+						set(_HAS_UNRESOLVED_DEPENDS ON)
+					endif()
+				else()
+					if("${_ENTITY2}" IN_LIST _UNRESOLVED)
+						set(_HAS_UNRESOLVED_OPTIONAL_DEPENDS ON)
+					endif()
+				endif()
+			endforeach()
+			list(JOIN _DEPENDS ", " _DEPENDS)
+		else()
+			set(_DEPENDS "")
+		endif()
+		if(_HAS_DISABLED_DEPENDS) # A required dependency is disabled, so disable this entry.
+			message(STATUS "[${_LABEL}] Disabled by dependency.")
+			list(REMOVE_ITEM _UNRESOLVED "${_ENTITY}")
+			list(APPEND _DISABLED "${_ENTITY}")
+			streamfx_disable_component(${_ENTITY})
+			continue()
+		elseif(_HAS_UNRESOLVED_DEPENDS)
+			continue()
+		elseif(_HAS_UNRESOLVED_OPTIONAL_DEPENDS AND (_UNRESOLVED_LOOP LESS 8))
+			# Temporarily skip this element while there are still remaining loops.
+			continue()
+		endif()
+
+		# Call Resolver function
+		if(_RESOLVER)
+			set(COMPONENT_TARGET "${RENTITY}")
+			set(COMPONENT_ALIAS "${_ALIAS}")
+			set(COMPONENT_OPTION "${_OPTION}")
+			cmake_language(CALL ${_RESOLVER})
+		endif()
+		if(${_OPTION}_DISABLED) # Test for resolve disabling.
+			message(STATUS "[${_LABEL}] Disabled by resolver.")
+			list(REMOVE_ITEM _UNRESOLVED "${_ENTITY}")
+			list(APPEND _DISABLED "${_ENTITY}")
+			continue()
+		endif()
+
+		# Finally, if everything went well, we now have a resolved entity.
+		list(REMOVE_ITEM _UNRESOLVED "${_ENTITY}")
+		list(APPEND _RESOLVED "${_ENTITY}")
+		message(STATUS "[${_LABEL}] Enabled. Depends: ${_DEPENDS}")
+	endforeach()
+endwhile()
+
+#- Linking
+target_link_libraries(StreamFX PRIVATE $<LINK_LIBRARY:WHOLE_ARCHIVE,StreamFX_Core>)
+foreach(_ENTITY ${_RESOLVED})
+	set(RENTITY "StreamFX_${_ENTITY}")
+	get_target_property(_DEPENDS "${RENTITY}" COMPONENT_DEPENDS)
+
+	# Finally if everything is correct, do things.
+	target_link_libraries(StreamFX PRIVATE $<LINK_LIBRARY:WHOLE_ARCHIVE,${RENTITY}>)
+
+	if(_DEPENDS)
 		foreach(_DEPEND ${_DEPENDS})
-			get_target_property(_DNAME ${COMPONENT} COMPONENT_LABEL)
-			get_target_property(_DOPTION ${COMPONENT} COMPONENT_OPTION)
-			if((NOT ${_DOPTION}) OR (${_DOPTION}_DISABLED))
-				message(STATUS "[${_NAME}] Missing or disabled dependency on '${_DNAME}'.")
-				set(_HASDEPENDENCY OFF)
-				continue()
+			list(GET _DEPEND 0 _ENTITY2)
+			set(RENTITY2 "StreamFX_${_ENTITY2}")
+
+			streamfx_enabled_component(${_ENTITY2} T_CHECK)
+			if(T_CHECK)
+				target_link_libraries(${RENTITY}
+					PUBLIC
+						$<LINK_LIBRARY:WHOLE_ARCHIVE,${RENTITY2}>
+				)
 			endif()
 		endforeach()
-		if(NOT _HASDEPENDENCY)
-			message(STATUS "[${_NAME}] Disabled due to missing dependencies.")
-			continue()
-		endif()
-
-		# Finally if everything is correct, do things.
-		message(STATUS "[${_NAME}] Enabled.")
-		target_link_libraries(StreamFX PRIVATE $<LINK_LIBRARY:WHOLE_ARCHIVE,${COMPONENT}>)
-	endforeach()
-endif()
+	endif()
+endforeach()
 
 ################################################################################
 # Installation
